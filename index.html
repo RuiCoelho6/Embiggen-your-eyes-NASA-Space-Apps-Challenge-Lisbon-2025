@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>NASA Image Zoom Demo - Enhanced Quality</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.0.0/openseadragon.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="styles.css"> 
+  </head>
+  <body>
+    <div id="viewer" style="width:100vw; height:100vh;"></div>
+    
+    <div id="filter-panel">
+      <div id="filter-header" onclick="toggleFilterPanel()">
+        <span id="filter-title">Label Filters</span>
+        <span id="filter-arrow">◀</span>
+      </div>
+      
+      <div id="filter-content">
+        <div id="filter-list">
+          <div style="font-size: 12px; color: #888; text-align: center; padding: 20px;">
+            No labels yet.<br>Create labels using the controls panel.
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="labeling-indicator" class="labeling-mode-indicator">
+      Click on the image to place a label<br>
+      <small>Press ESC to cancel</small>
+    </div>
+    
+    <div id="label-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; display: none; align-items: center; justify-content: center;">
+      <div style="background: #333; padding: 25px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); min-width: 300px;">
+        <h3 style="color: white; margin-top: 0; margin-bottom: 20px; text-align: center;">Create Label</h3>
+        
+        <div style="margin-bottom: 15px;">
+          <label style="color: #ccc; display: block; margin-bottom: 8px; font-size: 14px;">Label Text:</label>
+          <input type="text" id="modal-label-text" placeholder="Enter label name" maxlength="30" 
+                 style="width: 100%; padding: 10px; border: 1px solid #555; border-radius: 6px; background: #222; color: white; font-size: 14px; box-sizing: border-box;">
+        </div>
+        
+        <div style="margin-bottom: 25px;">
+          <label style="color: #ccc; display: block; margin-bottom: 8px; font-size: 14px;">Label Color:</label>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="color" id="modal-color-picker" value="#ff0000" 
+                   style="width: 50px; height: 35px; border: none; border-radius: 6px; cursor: pointer;">
+            <span id="color-preview" style="color: #ff0000; font-weight: bold; font-size: 14px;">#ff0000</span>
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button onclick="cancelLabelCreation()" 
+                  style="padding: 10px 20px; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">Cancel</button>
+          <button onclick="confirmLabelCreation()" id="confirm-label-btn"
+                  style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">Create Label</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="controls">
+      <div id="controls-header" onclick="toggleMenu()">
+        <span id="controls-title">Control Panel</span>
+        <span id="toggle-arrow">▶</span>
+      </div>
+      
+      <div id="controls-content">
+        <div class="control-section">
+          <div class="section-title">Labels</div>
+          <button onclick="startLabelingMode()" id="add-label-btn">Add Label</button>
+          <button onclick="clearAllLabels()">Clear All Labels</button>
+          <button onclick="exportLabels()">Export Labels</button>
+        </div>
+        
+        <div class="control-section">
+          <div class="section-title">View Controls</div>
+          <button onclick="resetView()">Reset View</button>
+          <button onclick="toggleFullscreen()">Toggle Fullscreen</button>
+          <button onclick="saveImageWithLabels()">Download Image</button>
+          <label for="image-upload-input" class="button-label">Upload Image</label>
+          <input type="file" 
+                 id="image-upload-input" 
+                 accept=".jpg,.jpeg,.png,.tiff" 
+                 onchange="handleImageUpload(event)" 
+                 style="display: none;">
+        </div>
+        
+        <div class="control-section">
+          <div class="section-title">Image Quality</div>
+          
+          <div class="toggle-container">
+            <span class="toggle-label">Image Smoothing</span>
+            <div class="toggle-switch active" id="smoothing-toggle" onclick="toggleSmoothing()">
+              <div class="toggle-slider"></div>
+            </div>
+          </div>
+          
+        </div>
+        
+        <div class="keyboard-hint">
+          <strong>Keyboard Shortcuts:</strong><br>
+          R = Reset View<br>
+          F = Fullscreen<br>
+          S = Toggle Smoothing<br>
+          L = Add Label (Start Labeling Mode)<br>
+          M = Toggle Control Panel (Right Panel)<br>
+          N = Toggle Label Filter (Left Panel)<br>
+          X = Rotate Clockwise<br>
+          Z = Rotate Counter-Clockwise<br>
+          Arrow Keys = Panning<br>
+          U = Toggle All UI<br>
+          \ = Toggle Log Panel<br>
+        </div>
+        
+      </div>
+    </div>
+    
+    <div id="log-panel">
+      <div id="log-output">
+        </div>
+    </div>
+
+    <div id="controls-tab" class="slide-tab" onclick="toggleMenu()">
+      ▶
+    </div>
+    <div id="filter-tab" class="slide-tab" onclick="toggleFilterPanel()">
+      ◀
+    </div>
+    
+    <script src="script.js"></script>
+  </body>
+</html>
