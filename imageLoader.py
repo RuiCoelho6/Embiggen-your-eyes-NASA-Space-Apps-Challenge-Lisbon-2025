@@ -1,84 +1,134 @@
-import pyvips
 import os
-import sys
 import shutil
+import unicodedata
+import re
+import pyvips
+from pathlib import Path
+from typing import Dict, Optional
 
-# --- Configuration ---
-OUTPUT_DIR = "image_data" # Central directory for all DZI output
-DEFAULT_INPUT = "nasa_big.jpg"
-DEFAULT_OUTPUT = "nasa_zoom"
-DEFAULT_QUALITY = 90
-# ---------------------
+# =========================
+# Configurações por omissão
+# =========================
+DEFAULT_ASSETS_DIR = "assets"
+DEFAULT_TILE_SIZE = 512
+DEFAULT_OVERLAP = 2
+DEFAULT_QUALITY = 90  # JPEG quality
+SUPPORTED_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 
-def process_image(input_file, output_name, quality=DEFAULT_QUALITY):
+
+def _slugify(text: str) -> str:
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^a-zA-Z0-9._-]+", "-", text).strip("-").lower()
+    # evitar nomes só com extensão
+    return text or "image"
+
+
+def _ensure_clean_dir(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def process_image(
+    input_file: str,
+    assets_dir: str = DEFAULT_ASSETS_DIR,
+    folder_name: Optional[str] = None,
+    tile_size: int = DEFAULT_TILE_SIZE,
+    overlap: int = DEFAULT_OVERLAP,
+    quality: int = DEFAULT_QUALITY,
+) -> Dict[str, str]:
     """
-    Processes a large image into Deep Zoom tiles inside the OUTPUT_DIR.
-    This function is now designed to be called by the FastAPI server after a file upload.
-    It supports JPG, PNG, and TIFF.
+    Converte uma imagem grande em Deep Zoom (DZI + tiles) dentro de /assets.
+    Estrutura final:
+      assets/<folder>/ <folder>.dzi
+      assets/<folder>/ tiles/  <…tiles gerados…>
+
+    Returns: dict com caminhos úteis.
     """
-    
-    if not os.path.exists(input_file):
-        raise FileNotFoundError(f"Input file '{input_file}' not found.")
-    
-    # Ensure the main output directory exists
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-        print(f"SERVER: Created output directory: {OUTPUT_DIR}")
-        
-    # Define the full path for the output files
-    base_output_path = os.path.join(OUTPUT_DIR, output_name)
-    dzi_file = f"{base_output_path}.dzi"
-    
-    # Check file extension to decide on processing method
-    file_extension = os.path.splitext(input_file)[1].lower()
+    src = Path(input_file)
+    if not src.exists():
+        raise FileNotFoundError(f"Ficheiro não encontrado: {src}")
 
-    if file_extension in ['.jpg', '.jpeg', '.tiff']:
-        try:
-            print(f"SERVER: Loading and processing JPG/TIFF image: {input_file} -> {dzi_file}")
-            
-            image = pyvips.Image.new_from_file(input_file, access="sequential")
-            
-            # Auto-rotate based on EXIF orientation
-            if image.get_typeof("exif-orientation") > 0:
-                image = image.autorot()
+    ext = src.suffix.lower()
+    if ext not in SUPPORTED_EXTS:
+        raise ValueError(f"Tipo não suportado: {ext} (suporta {sorted(SUPPORTED_EXTS)})")
 
-            # Generate DZI with JPEG tiles
-            image.dzsave(base_output_path, tile_size=512, overlap=2, suffix=".jpg", depth="onepixel", centre=True, Q=quality)
-            print(f"SERVER: ✅ Successfully generated JPG tiles inside {OUTPUT_DIR}!")
-            
-        except Exception as e:
-            print(f"Error processing JPG/TIFF image: {e}")
-            raise
+    # nome base da pasta (por omissão, nome do ficheiro sem extensão)
+    base_name = folder_name or _slugify(src.stem)
 
-    elif file_extension == '.png':
-        try:
-            print(f"SERVER: Loading and processing PNG image: {input_file} -> {dzi_file}")
-            
-            image = pyvips.Image.new_from_file(input_file, access="sequential")
-            
-            # Auto-rotate based on EXIF orientation (PNG can sometimes have it too)
-            if image.get_typeof("exif-orientation") > 0:
-                image = image.autorot()
-                
-            # Generate DZI with PNG tiles for transparency/quality
-            image.dzsave(base_output_path, tile_size=512, overlap=2, suffix=".png", depth="onepixel", centre=True)
-            print(f"SERVER: ✅ Successfully generated PNG tiles inside {OUTPUT_DIR}!")
-            
-        except Exception as e:
-            print(f"Error processing PNG image: {e}")
-            raise
+    assets_root = Path(assets_dir)
+    target_dir = assets_root / base_name
+    _ensure_clean_dir(target_dir)
+
+    # Caminho base para o dzsave (pyvips vai gerar <base>.dzi e <base>_files/)
+    base_output_path = target_dir / base_name  # ex: assets/marte/marte
+    dzi_file = base_output_path.with_suffix(".dzi")
+
+    # Carregar imagem
+    image = pyvips.Image.new_from_file(str(src), access="sequential")
+
+    # Autorot (se não houver EXIF não faz nada e não dá erro)
+    try:
+        image = image.autorot()
+    except Exception:
+        pass
+
+    # Descobrir se devemos usar PNG (alpha/transparência) ou JPEG
+    use_png_tiles = False
+    try:
+        use_png_tiles = bool(getattr(image, "hasalpha")() if hasattr(image, "hasalpha") else False)
+    except Exception:
+        use_png_tiles = False
+
+    tile_suffix = ".png" if use_png_tiles else ".jpg"
+
+    # Gerar DZI + tiles com pyvips
+    # depth="onepixel" cria todos os níveis até 1 px — ótimo para zoom profundo
+    # centre=True para uma melhor distribuição
+    kwargs = dict(
+        tile_size=tile_size,
+        overlap=overlap,
+        suffix=tile_suffix,
+        depth="onepixel",
+        centre=True,
+    )
+    if not use_png_tiles:
+        kwargs["Q"] = quality  # só aplica a JPEG
+
+    image.dzsave(str(base_output_path), **kwargs)
+
+    # Renomear a pasta padrão <base>_files para tiles/
+    default_tiles_dir = target_dir / f"{base_name}_files"
+    final_tiles_dir = target_dir / "tiles"
+    if final_tiles_dir.exists():
+        shutil.rmtree(final_tiles_dir)
+    if default_tiles_dir.exists():
+        default_tiles_dir.rename(final_tiles_dir)
     else:
-        raise ValueError(f"Unsupported image file type: {file_extension}")
-        
-    # After successful processing, clean up the temporary source file
-    if os.path.exists(input_file):
-        os.remove(input_file)
-        print(f"SERVER: Removed temporary source file: {input_file}")
+        # fallback: alguns ambientes/flags podem gerar outro nome;
+        # garantimos que há uma pasta de tiles
+        raise RuntimeError("Pasta de tiles não encontrada após dzsave.")
 
-    # Return the URL for the DZI file
-    return f"http://127.0.0.1:8000/{output_name}.dzi"
+    return {
+        "folder": str(target_dir),
+        "dzi": str(dzi_file),
+        "tiles_dir": str(final_tiles_dir),
+        "tile_suffix": tile_suffix,
+    }
 
-# --- Initial Processing Block (Removed or kept minimal for first run) ---
-# NOTE: To ensure the server starts with *something* to display, you should
-# call this logic from run.py instead, and ONLY call it once, not inside imageLoader.py
-# when it's imported by server.py. For now, we leave this file as a module.
+
+if __name__ == "__main__":
+    # Exemplo rápido de utilização:
+    # python imageLoader.py /caminho/para/ficheiro.png
+    import sys
+    if len(sys.argv) < 2:
+        print("Uso: python imageLoader.py <imagem> [nome_da_pasta]")
+        sys.exit(1)
+
+    img_path = sys.argv[1]
+    folder = sys.argv[2] if len(sys.argv) >= 3 else None
+    info = process_image(img_path, folder_name=folder)
+    print("✔ Deep Zoom gerado:")
+    for k, v in info.items():
+        print(f"  - {k}: {v}")
