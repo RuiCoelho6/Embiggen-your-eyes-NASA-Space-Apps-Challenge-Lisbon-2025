@@ -6,16 +6,16 @@ import os
 # 1. Run image loader (generates .dzi + tiles)
 print("🔄 Generating high-quality image tiles...")
 # This now calls the simplified/non-interactive block in the updated imageLoader.py
-subprocess.run(["py", "-3.10", "imageLoader.py"], check=True)
+subprocess.run(["python", "imageLoader.py"], check=True)
 
 # 2. Start server (non-blocking, keep it alive)
 print("🚀 Starting server...")
 server = subprocess.Popen([
-    "py", "-3.10", "-m", "uvicorn", "server:app", "--reload", "--port", "8000"
+    "python", "-m", "uvicorn", "server:app", "--reload", "--port", "8000"
 ])
 
 # 3. Give the server a moment to start
-time.sleep(3) 
+time.sleep(3)
 
 # 4. Check if files were generated successfully
 # FIX: Use os.path.join() to construct cross-platform file paths.
@@ -24,7 +24,7 @@ FILES_PATH = os.path.join("image_data", "nasa_zoom_files")
 
 if os.path.exists(DZI_PATH) and os.path.exists(FILES_PATH):
     print("✅ Tiles generated successfully!")
-    
+
     # 5. Open the viewer in browser
     webbrowser.open("index.html")
     print("🌟 Enhanced NASA Image Viewer opened in your browser.")
