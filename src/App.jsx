@@ -38,10 +38,32 @@ async function loadDzi(dataset) {
 
 export default function App() {
   const [dataset, setDataset] = useState("super-venus");
+  const [datasets, setDatasets] = useState([]);
   const viewerEl = useRef(null);
   const osdRef = useRef(null);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+
+  // Load available datasets on mount
+  useEffect(() => {
+    const loadDatasets = async () => {
+      try {
+        const res = await fetch('/api/datasets');
+        if (res.ok) {
+          const data = await res.json();
+          setDatasets(data.datasets || []);
+          if (data.datasets && data.datasets.length > 0 && !data.datasets.includes(dataset)) {
+            setDataset(data.datasets[0]);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not load datasets list:", e);
+        // Fallback to hardcoded list
+        setDatasets(["super-venus", "galaxy", "asteroid-psyche"]);
+      }
+    };
+    loadDatasets();
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -118,9 +140,15 @@ export default function App() {
         <label>
           Dataset:&nbsp;
           <select value={dataset} onChange={(e) => setDataset(e.target.value)}>
-            <option value="super-venus">super-venus</option>
-            <option value="galaxy">Galaxy</option>
-            <option value="asteroid-psyche">asteroid-psyche</option>
+            {datasets.length === 0 ? (
+              <option value="">Loading...</option>
+            ) : (
+              datasets.map((ds) => (
+                <option key={ds} value={ds}>
+                  {ds}
+                </option>
+              ))
+            )}
           </select>
         </label>
         {info && <span style={{ color: "#8f8", marginLeft: 12, fontSize: 12 }}>{info}</span>}
