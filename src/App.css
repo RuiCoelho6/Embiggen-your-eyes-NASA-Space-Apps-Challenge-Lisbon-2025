@@ -1,0 +1,44 @@
+/* Pins layer & button stay the same from your last version */
+.gm-pins-layer { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.gm-pin-btn { all: unset; position: absolute; pointer-events: auto; cursor: pointer; transform: translate(-50%, -100%); transition: transform 0.15s ease; }
+.gm-pin-btn:hover { transform: translate(-50%, -102%) scale(1.05); }
+.gm-pin-btn:active { transform: translate(-50%, -98%) scale(0.96); }
+.gm-pin-svg { width: 34px; height: 34px; display: block; filter: drop-shadow(0 3px 6px rgba(0,0,0,.4)); }
+
+/* More readable tooltip */
+.tooltip {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  transform: translate(-50%, -100%);
+  background: rgba(0, 0, 0, 0.92);
+  color: #fff;
+  padding: 12px 14px;                 /* more padding */
+  border-radius: 10px;
+  width: 280px;                        /* wider */
+  font-size: 14.5px;                   /* bigger text */
+  line-height: 1.5;                    /* more readable */
+  text-align: left;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.12);
+  pointer-events: none;
+  -webkit-font-smoothing: antialiased; /* crisper text */
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tooltip strong {
+  display: block;
+  font-size: 16px;                     /* bigger title */
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+}
+
+.tooltip p {
+  margin: 0;
+}
+
+/* Hide any leftover OpenSeadragon buttons, just in case */
+.openseadragon-container .openseadragon-button,
+.openseadragon-container .openseadragon-control {
+  display: none !important;
+}
